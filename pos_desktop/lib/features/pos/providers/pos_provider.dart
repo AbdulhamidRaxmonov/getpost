@@ -4,8 +4,8 @@ import '../../../core/providers/providers.dart';
 
 // ─── Products ───────────────────────────────────────────────
 final productsProvider = FutureProvider.family<List<ProductModel>, Map<String, dynamic>>((ref, params) async {
-  final api = ref.watch(apiServiceProvider);
-  final session = ref.watch(posSessionProvider);
+  final api = ref.read(apiServiceProvider);
+  final session = ref.read(posSessionProvider);
   final data = await api.getProducts(
     search: params['search'] as String?,
     categoryId: params['category_id'] as int?,
@@ -16,7 +16,7 @@ final productsProvider = FutureProvider.family<List<ProductModel>, Map<String, d
 
 // ─── Categories ─────────────────────────────────────────────
 final categoriesProvider = FutureProvider<List<CategoryModel>>((ref) async {
-  final api = ref.watch(apiServiceProvider);
+  final api = ref.read(apiServiceProvider);
   final data = await api.getCategories();
   return data.map((e) => CategoryModel.fromJson(e as Map<String, dynamic>)).toList();
 });

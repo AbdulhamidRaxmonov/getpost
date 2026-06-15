@@ -15,12 +15,20 @@ class _RouterNotifier extends ChangeNotifier {
   final Ref _ref;
 
   _RouterNotifier(this._ref) {
-    // authState o'zgarganda GoRouter redirect qayta ishlaydi
-    _ref.listen<AuthState>(authStateProvider, (_, __) {
-      notifyListeners();
+    // Faqat authState o'zgarganda redirect ishlaydi
+    // posSessionProvider ni TINGLAMAMIZ — mahsulotlar reload bo'lib ketadi
+    _ref.listen<AuthState>(authStateProvider, (previous, next) {
+      // Faqat isAuthenticated o'zgarganda notify qil
+      if (previous?.isAuthenticated != next.isAuthenticated) {
+        notifyListeners();
+      }
     });
-    _ref.listen<PosSession?>(posSessionProvider, (_, __) {
-      notifyListeners();
+    _ref.listen<PosSession?>(posSessionProvider, (previous, next) {
+      // Faqat shift holati o'zgarganda notify qil
+      if (previous?.isShiftOpen != next?.isShiftOpen ||
+          previous?.terminalId != next?.terminalId) {
+        notifyListeners();
+      }
     });
   }
 
