@@ -2,12 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000/api';
+  static const String defaultBaseUrl = 'http://127.0.0.1:8000/api';
 
   late final Dio _dio;
   final SharedPreferences _prefs;
 
   ApiService({required SharedPreferences prefs}) : _prefs = prefs {
+    // SharedPreferences dan URL olish, yo'q bo'lsa default
+    final savedUrl = prefs.getString('api_url');
+    final baseUrl = (savedUrl != null && savedUrl.isNotEmpty)
+        ? savedUrl
+        : defaultBaseUrl;
+
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
@@ -25,9 +31,16 @@ class ApiService {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          print('[API] ${options.method} ${options.uri}');
           handler.next(options);
         },
+        onResponse: (response, handler) {
+          print('[API] ${response.statusCode} ${response.requestOptions.path}');
+          handler.next(response);
+        },
         onError: (error, handler) {
+          print('[API ERROR] ${error.response?.statusCode} '
+              '${error.requestOptions.path}: ${error.message}');
           handler.next(error);
         },
       ),

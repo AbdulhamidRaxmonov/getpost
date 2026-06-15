@@ -14,7 +14,7 @@ class TerminalSetupScreen extends ConsumerStatefulWidget {
 
 class _TerminalSetupScreenState extends ConsumerState<TerminalSetupScreen> {
   final _terminalIdController = TextEditingController(text: '1');
-  final _apiUrlController = TextEditingController(text: 'http://localhost:8000/api');
+  final _apiUrlController = TextEditingController(text: 'http://127.0.0.1:8000/api');
   bool _isLoading = false;
   String _error = '';
 
