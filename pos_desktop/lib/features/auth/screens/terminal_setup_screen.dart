@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/services/api_service.dart';
 
 class TerminalSetupScreen extends ConsumerStatefulWidget {
   const TerminalSetupScreen({super.key});
@@ -36,16 +35,19 @@ class _TerminalSetupScreenState extends ConsumerState<TerminalSetupScreen> {
     setState(() { _isLoading = true; _error = ''; });
 
     try {
-      final prefs = ref.read(sharedPreferencesProvider);
-      await prefs.setInt('terminal_id', terminalId);
-      await prefs.setString('terminal_name', 'Kassa-$terminalId');
-      await prefs.setString('api_url', _apiUrlController.text.trim());
+      // PosSessionNotifier orqali saqlash
+      ref.read(posSessionProvider.notifier).setSession(
+        terminalId: terminalId,
+        terminalName: 'Kassa-$terminalId',
+        branchId: 1,
+        branchName: 'Asosiy filial',
+        organizationId: 1,
+        organizationName: 'YesPOS Demo',
+      );
 
-      // Set dummy session for testing
-      await prefs.setInt('branch_id', 1);
-      await prefs.setString('branch_name', 'Asosiy filial');
-      await prefs.setInt('organization_id', 1);
-      await prefs.setString('organization_name', 'YesPOS Demo');
+      // API URL ni saqlash
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.setString('api_url', _apiUrlController.text.trim());
 
       if (mounted) context.go('/login');
     } catch (e) {
