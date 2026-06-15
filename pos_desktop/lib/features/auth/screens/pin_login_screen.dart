@@ -144,7 +144,10 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorText = '';
+    });
 
     final success = await ref.read(authStateProvider.notifier).pinLogin(
       terminalId: session.terminalId,
@@ -155,13 +158,15 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
     setState(() => _isLoading = false);
 
     if (!success) {
+      // Xato xabarini provider dan olish
+      final error = ref.read(authStateProvider).error;
       setState(() {
-        _errorText = 'PIN kod noto\'g\'ri!';
+        _errorText = error ?? 'PIN kod noto\'g\'ri!';
         _pin = '';
       });
       _shakeController.forward(from: 0);
     }
-    // Muvaffaqiyatli bo'lsa — GoRouter redirect o'zi yo'naltiradi
+    // Muvaffaqiyatli bo'lsa GoRouter redirect o'zi yo'naltiradi
   }
 
   @override

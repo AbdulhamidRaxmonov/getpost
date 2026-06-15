@@ -7,12 +7,12 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 
-// SharedPreferences
+// ─── SharedPreferences ───────────────────────────────────────────────────────
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError(),
 );
 
-// Services
+// ─── Services ─────────────────────────────────────────────────────────────────
 final apiServiceProvider = Provider<ApiService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return ApiService(prefs: prefs);
@@ -29,23 +29,23 @@ final storageServiceProvider = Provider<StorageService>((ref) {
   return StorageService(prefs: prefs);
 });
 
-// Auth state
-final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  final sessionNotifier = ref.watch(posSessionProvider.notifier);
-  return AuthNotifier(authService, sessionNotifier);
-});
-
-// Session (terminal, shift, user info)
+// ─── Session ──────────────────────────────────────────────────────────────────
 final posSessionProvider =
     StateNotifierProvider<PosSessionNotifier, PosSession?>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return PosSessionNotifier(prefs);
 });
 
-// ========================
-// Auth State
-// ========================
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+final authStateProvider =
+    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  return AuthNotifier(authService, ref);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AuthState
+// ═══════════════════════════════════════════════════════════════════════════════
 class AuthState {
   final bool isLoading;
   final bool isAuthenticated;
@@ -80,10 +80,9 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
-  final PosSessionNotifier _sessionNotifier;
+  final Ref _ref;
 
-  AuthNotifier(this._authService, this._sessionNotifier)
-      : super(const AuthState()) {
+  AuthNotifier(this._authService, this._ref) : super(const AuthState()) {
     _init();
   }
 
@@ -104,37 +103,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String pin,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
+
     try {
       final result = await _authService.pinLogin(
         terminalId: terminalId,
         pin: pin,
       );
 
-      if (result != null) {
-        // Session ma'lumotlarini saqlash
-        if (result['terminal'] != null) {
-          _sessionNotifier.setSessionFromLoginResult(result);
-        }
-
+      if (result == null) {
         state = state.copyWith(
           isLoading: false,
-          isAuthenticated: true,
-          token: result['token'],
-          user: result['user'] as Map<String, dynamic>?,
+          error: 'PIN kod noto\'g\'ri',
         );
-        return true;
+        return false;
       }
+
+      // Session ni yangilash — ref orqali (circular dependency yo'q)
+      _ref.read(posSessionProvider.notifier).setSessionFromLoginResult(result);
 
       state = state.copyWith(
         isLoading: false,
-        isAuthenticated: false,
-        error: 'PIN kod noto\'g\'ri',
+        isAuthenticated: true,
+        token: result['token'] as String?,
+        user: result['user'] as Map<String, dynamic>?,
       );
-      return false;
+
+      return true;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        isAuthenticated: false,
         error: e.toString(),
       );
       return false;
@@ -147,9 +144,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-// ========================
-// POS Session State
-// ========================
+// ═══════════════════════════════════════════════════════════════════════════════
+// PosSession
+// ═══════════════════════════════════════════════════════════════════════════════
 class PosSession {
   final int terminalId;
   final String terminalName;
@@ -205,41 +202,43 @@ class PosSessionNotifier extends StateNotifier<PosSession?> {
 
   void _loadSession() {
     final terminalId = _prefs.getInt('terminal_id');
-    final terminalName = _prefs.getString('terminal_name');
-    final branchId = _prefs.getInt('branch_id');
-    final branchName = _prefs.getString('branch_name');
-    final orgId = _prefs.getInt('organization_id');
-    final orgName = _prefs.getString('organization_name');
+    if (terminalId == null) return;
 
-    if (terminalId != null && branchId != null && orgId != null) {
-      state = PosSession(
-        terminalId: terminalId,
-        terminalName: terminalName ?? 'Kassa',
-        branchId: branchId,
-        branchName: branchName ?? 'Filial',
-        organizationId: orgId,
-        organizationName: orgName ?? '',
-        shiftId: _prefs.getInt('shift_id'),
-        isShiftOpen: _prefs.getBool('shift_open') ?? false,
-        openingCash: _prefs.getDouble('opening_cash') ?? 0,
-      );
-    }
+    final branchId = _prefs.getInt('branch_id') ?? 1;
+    final orgId = _prefs.getInt('organization_id') ?? 1;
+
+    state = PosSession(
+      terminalId: terminalId,
+      terminalName: _prefs.getString('terminal_name') ?? 'Kassa',
+      branchId: branchId,
+      branchName: _prefs.getString('branch_name') ?? 'Filial',
+      organizationId: orgId,
+      organizationName: _prefs.getString('organization_name') ?? '',
+      shiftId: _prefs.getInt('shift_id'),
+      isShiftOpen: _prefs.getBool('shift_open') ?? false,
+      openingCash: _prefs.getDouble('opening_cash') ?? 0,
+    );
   }
 
-  // PIN login dan kelgan ma'lumotlar bilan session yaratish
+  /// Laravel PIN login javobidan session yaratish
   void setSessionFromLoginResult(Map<String, dynamic> result) {
-    final terminal = result['terminal'] as Map<String, dynamic>?;
+    final terminal = result['terminal'];
     if (terminal == null) return;
 
-    final branch = terminal['branch'] as Map<String, dynamic>? ?? {};
-    final org = branch['organization'] as Map<String, dynamic>? ?? {};
+    final branch = terminal['branch'] ?? {};
+    final org = branch['organization'] ?? {};
 
-    final terminalId = terminal['id'] as int;
+    final terminalId = terminal['id'] as int? ?? state?.terminalId ?? 1;
     final terminalName = terminal['name'] as String? ?? 'Kassa';
     final branchId = branch['id'] as int? ?? state?.branchId ?? 1;
-    final branchName = branch['name'] as String? ?? state?.branchName ?? '';
+    final branchName = branch['name'] as String? ?? '';
     final orgId = org['id'] as int? ?? state?.organizationId ?? 1;
-    final orgName = org['name'] as String? ?? state?.organizationName ?? '';
+    final orgName = org['name'] as String? ?? '';
+
+    final currentShift = result['current_shift'];
+    final shiftId = currentShift?['id'] as int?;
+    final isShiftOpen = currentShift != null &&
+        currentShift['status'] == 'open';
 
     // SharedPreferences ga saqlash
     _prefs.setInt('terminal_id', terminalId);
@@ -248,12 +247,11 @@ class PosSessionNotifier extends StateNotifier<PosSession?> {
     _prefs.setString('branch_name', branchName);
     _prefs.setInt('organization_id', orgId);
     _prefs.setString('organization_name', orgName);
-
-    // Mavjud shift ma'lumotlarini saqlash
-    final currentShift = result['current_shift'] as Map<String, dynamic>?;
-    if (currentShift != null) {
-      _prefs.setInt('shift_id', currentShift['id'] as int);
-      _prefs.setBool('shift_open', currentShift['status'] == 'open');
+    _prefs.setBool('shift_open', isShiftOpen);
+    if (shiftId != null) {
+      _prefs.setInt('shift_id', shiftId);
+    } else {
+      _prefs.remove('shift_id');
     }
 
     state = PosSession(
@@ -263,12 +261,12 @@ class PosSessionNotifier extends StateNotifier<PosSession?> {
       branchName: branchName,
       organizationId: orgId,
       organizationName: orgName,
-      shiftId: currentShift?['id'] as int?,
-      isShiftOpen: currentShift?['status'] == 'open',
+      shiftId: shiftId,
+      isShiftOpen: isShiftOpen,
     );
   }
 
-  // Terminal setup ekranidan session yaratish
+  /// Terminal setup ekranidan session yaratish
   void setSession({
     required int terminalId,
     required String terminalName,
