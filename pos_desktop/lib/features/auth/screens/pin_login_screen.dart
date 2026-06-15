@@ -140,7 +140,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
   Future<void> _submitPin() async {
     final session = ref.read(posSessionProvider);
     if (session == null) {
-      context.go('/setup');
+      if (mounted) context.go('/setup');
       return;
     }
 
@@ -152,22 +152,16 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
     );
 
     if (!mounted) return;
-
     setState(() => _isLoading = false);
 
-    if (success) {
-      if (!session.isShiftOpen) {
-        context.go('/shift/open');
-      } else {
-        context.go('/pos');
-      }
-    } else {
+    if (!success) {
       setState(() {
         _errorText = 'PIN kod noto\'g\'ri!';
         _pin = '';
       });
       _shakeController.forward(from: 0);
     }
+    // Muvaffaqiyatli bo'lsa — GoRouter redirect o'zi yo'naltiradi
   }
 
   @override

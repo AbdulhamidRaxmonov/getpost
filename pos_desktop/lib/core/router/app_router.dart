@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,23 +10,31 @@ import '../../features/shift/screens/shift_report_screen.dart';
 import '../providers/providers.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final session = ref.watch(posSessionProvider);
+  // RouterNotifier — authState o'zgarganda GoRouter ni xabardor qiladi
+  final notifier = _RouterNotifier(ref);
 
   return GoRouter(
     initialLocation: '/login',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final isLoggedIn = authState.isAuthenticated;
-      final isLoginPage = state.matchedLocation == '/login';
-      final isSetupPage = state.matchedLocation == '/setup';
+      final isLoggedIn = notifier.isLoggedIn;
+      final hasSession = notifier.hasSession;
+      final isShiftOpen = notifier.isShiftOpen;
 
-      if (!isLoggedIn && !isLoginPage && !isSetupPage) {
-        return '/login';
+      final path = state.matchedLocation;
+      final isLoginPage = path == '/login';
+      final isSetupPage = path == '/setup';
+
+      // Login qilmagan — login sahifasiga
+      if (!isLoggedIn) {
+        if (!isLoginPage && !isSetupPage) return '/login';
+        return null;
       }
 
+      // Login qilingan — login sahifasida tursa yo'naltir
       if (isLoggedIn && isLoginPage) {
-        if (session == null) return '/setup';
-        if (!session.isShiftOpen) return '/shift/open';
+        if (!hasSession) return '/setup';
+        if (!isShiftOpen) return '/shift/open';
         return '/pos';
       }
 
@@ -69,3 +76,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+// GoRouter ni Riverpod state o'zgarganda yangilash uchun
+class _RouterNotifier extends RouterNotifier {
+  final Ref _ref;
+
+  _RouterNotifier(this._ref) {
+    // authState o'zgarganda GoRouter redirect ni qayta ishga tushiradi
+    _ref.listen(authStateProvider, (_, __) => notifyListeners());
+    _ref.listen(posSessionProvider, (_, __) => notifyListeners());
+  }
+
+  bool get isLoggedIn => _ref.read(authStateProvider).isAuthenticated;
+
+  bool get hasSession => _ref.read(posSessionProvider) != null;
+
+  bool get isShiftOpen => _ref.read(posSessionProvider)?.isShiftOpen ?? false;
+}
