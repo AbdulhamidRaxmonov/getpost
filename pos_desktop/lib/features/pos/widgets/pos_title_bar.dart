@@ -27,8 +27,8 @@ class PosTitleBar extends StatelessWidget {
       onPanStart: (_) => windowManager.startDragging(),
       child: Container(
         height: 44,
-        color: Colors.white,
         decoration: const BoxDecoration(
+          color: Colors.white,
           border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
         ),
         child: Row(
