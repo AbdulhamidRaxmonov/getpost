@@ -44,10 +44,35 @@ class ApiService {
         'terminal_id': terminalId,
         'pin': pin,
       });
-      return response.data;
+
+      // Debug: javobni ko'rish
+      print('=== PIN LOGIN RESPONSE ===');
+      print('Status: ${response.statusCode}');
+      print('Data: ${response.data}');
+      print('=========================');
+
+      if (response.statusCode == 200 && response.data != null) {
+        // Token ni darhol saqlash
+        final token = response.data['token'] as String?;
+        if (token != null) {
+          await _prefs.setString('auth_token', token);
+          print('Token saved: $token');
+        }
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
     } on DioException catch (e) {
+      print('=== PIN LOGIN ERROR ===');
+      print('Status: ${e.response?.statusCode}');
+      print('Data: ${e.response?.data}');
+      print('Message: ${e.message}');
+      print('======================');
+
       if (e.response?.statusCode == 401) {
         throw Exception('PIN kod noto\'g\'ri');
+      }
+      if (e.response?.statusCode == 404) {
+        throw Exception('Terminal topilmadi. Terminal ID ni tekshiring.');
       }
       throw Exception('Server bilan ulanishda xatolik: ${e.message}');
     }

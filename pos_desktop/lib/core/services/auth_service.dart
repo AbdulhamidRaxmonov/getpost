@@ -16,24 +16,38 @@ class AuthService {
     required String pin,
   }) async {
     final result = await _api.pinLogin(terminalId: terminalId, pin: pin);
-    if (result != null) {
-      await _prefs.setString('auth_token', result['token']);
-      await _prefs.setString('auth_user', jsonEncode(result['user']));
 
-      // Save terminal info
-      if (result['terminal'] != null) {
-        final terminal = result['terminal'];
-        final branch = terminal['branch'];
-        final org = branch['organization'];
+    if (result == null) return null;
 
-        await _prefs.setInt('terminal_id', terminal['id']);
-        await _prefs.setString('terminal_name', terminal['name']);
-        await _prefs.setInt('branch_id', branch['id']);
-        await _prefs.setString('branch_name', branch['name']);
-        await _prefs.setInt('organization_id', org['id']);
-        await _prefs.setString('organization_name', org['name']);
-      }
+    // Token saqlash
+    final token = result['token'] as String?;
+    final user = result['user'];
+
+    if (token == null) {
+      print('WARNING: token is null in login response');
+      return null;
     }
+
+    await _prefs.setString('auth_token', token);
+
+    if (user != null) {
+      await _prefs.setString('auth_user', jsonEncode(user));
+    }
+
+    // Terminal ma'lumotlarini saqlash
+    final terminal = result['terminal'];
+    if (terminal != null) {
+      final branch = terminal['branch'] ?? {};
+      final org = branch['organization'] ?? {};
+
+      await _prefs.setInt('terminal_id', terminal['id'] as int? ?? 1);
+      await _prefs.setString('terminal_name', terminal['name'] as String? ?? 'Kassa');
+      await _prefs.setInt('branch_id', branch['id'] as int? ?? 1);
+      await _prefs.setString('branch_name', branch['name'] as String? ?? '');
+      await _prefs.setInt('organization_id', org['id'] as int? ?? 1);
+      await _prefs.setString('organization_name', org['name'] as String? ?? '');
+    }
+
     return result;
   }
 
@@ -43,7 +57,7 @@ class AuthService {
     final userStr = _prefs.getString('auth_user');
     if (userStr == null) return null;
     try {
-      return jsonDecode(userStr);
+      return jsonDecode(userStr) as Map<String, dynamic>;
     } catch (_) {
       return null;
     }
