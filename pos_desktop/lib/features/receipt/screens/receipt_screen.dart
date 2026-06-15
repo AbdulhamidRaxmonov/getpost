@@ -35,11 +35,14 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Future<void> _print() async {
     setState(() => _printing = true);
     try {
-      final doc = await _buildPdf();
-      await Printing.layoutPdf(onLayout: (_) => doc);
+      await Printing.layoutPdf(
+        onLayout: (_) async => await _buildPdf(),
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Chop etishda xatolik: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Chop etishda xatolik: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _printing = false);
