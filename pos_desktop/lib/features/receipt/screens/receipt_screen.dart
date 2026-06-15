@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -35,8 +38,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Future<void> _print() async {
     setState(() => _printing = true);
     try {
+      final pdfBytes = await _buildPdf();
       await Printing.layoutPdf(
-        onLayout: (_) async => await _buildPdf(),
+        onLayout: (_) async => pdfBytes,
       );
     } catch (e) {
       if (mounted) {
@@ -49,7 +53,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     }
   }
 
-  Future<List<int>> _buildPdf() async {
+  Future<Uint8List> _buildPdf() async {
     final doc = pw.Document();
     final order = widget.order;
     final items = (order['items'] as List?) ?? [];
@@ -129,7 +133,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       ),
     ));
 
-    return doc.save();
+    return Uint8List.fromList(await doc.save());
   }
 
   String _formatDate(String dateStr) {
