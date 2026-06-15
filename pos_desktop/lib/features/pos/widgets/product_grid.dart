@@ -10,7 +10,15 @@ class ProductGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final productsAsync = ref.watch(filteredProductsProvider);
+    // Search va category filter
+    final search = ref.watch(searchQueryProvider);
+    final categoryId = ref.watch(selectedCategoryProvider);
+
+    // Mahsulotlarni to'g'ridan yuklaymiz
+    final productsAsync = ref.watch(
+      productsProvider({'search': search, 'category_id': categoryId}),
+    );
+
     final cart = ref.watch(cartProvider);
 
     return Column(
@@ -19,7 +27,6 @@ class ProductGrid extends ConsumerWidget {
         if (cart.items.isNotEmpty)
           _CartTable(cartState: cart),
 
-        // ── Product list (bottom half) ────────────────────
         Expanded(
           child: productsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -29,14 +36,27 @@ class ProductGrid extends ConsumerWidget {
                 children: [
                   const Icon(Icons.wifi_off, size: 48, color: Color(0xFF9CA3AF)),
                   const SizedBox(height: 12),
-                  Text('Server bilan bog\'lanib bo\'lmadi', style: TextStyle(color: Colors.grey.shade500)),
+                  Text(
+                    'Mahsulotlar yuklanmadi',
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
                   const SizedBox(height: 8),
-                  TextButton(onPressed: () => ref.refresh(filteredProductsProvider), child: const Text('Qayta urinish')),
+                  TextButton(
+                    onPressed: () => ref.refresh(
+                      productsProvider({'search': search, 'category_id': categoryId}),
+                    ),
+                    child: const Text('Qayta urinish'),
+                  ),
                 ],
               ),
             ),
             data: (products) => products.isEmpty
-                ? const Center(child: Text('Mahsulotlar topilmadi', style: TextStyle(color: Color(0xFF9CA3AF))))
+                ? const Center(
+                    child: Text(
+                      'Mahsulotlar topilmadi',
+                      style: TextStyle(color: Color(0xFF9CA3AF)),
+                    ),
+                  )
                 : _ProductTable(products: products),
           ),
         ),

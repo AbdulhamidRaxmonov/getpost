@@ -150,9 +150,5 @@ final customersProvider = FutureProvider.family<List<CustomerModel>, String?>((r
   return data.map((e) => CustomerModel.fromJson(e as Map<String, dynamic>)).toList();
 });
 
-// ─── Filtered products (using search + category) ─────────────
-final filteredProductsProvider = Provider<AsyncValue<List<ProductModel>>>((ref) {
-  final search = ref.watch(searchQueryProvider);
-  final categoryId = ref.watch(selectedCategoryProvider);
-  return ref.watch(productsProvider({'search': search, 'category_id': categoryId}));
-});
+// ─── Filtered products ───────────────────────────────────────
+// filteredProductsProvider olib tashlandi — ProductGrid da to'g'ridan ishlatiladi
