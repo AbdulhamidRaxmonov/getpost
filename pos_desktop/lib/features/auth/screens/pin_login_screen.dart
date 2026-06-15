@@ -8,7 +8,6 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
-
 class PinLoginScreen extends ConsumerStatefulWidget {
   const PinLoginScreen({super.key});
 
