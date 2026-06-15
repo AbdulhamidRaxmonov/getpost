@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,8 +10,31 @@ import '../../features/shift/screens/close_shift_screen.dart';
 import '../../features/shift/screens/shift_report_screen.dart';
 import '../providers/providers.dart';
 
+// ChangeNotifier — GoRouter refreshListenable uchun
+class _RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  _RouterNotifier(this._ref) {
+    // authState o'zgarganda GoRouter redirect qayta ishlaydi
+    _ref.listen<AuthState>(authStateProvider, (_, __) {
+      notifyListeners();
+    });
+    _ref.listen<PosSession?>(posSessionProvider, (_, __) {
+      notifyListeners();
+    });
+  }
+
+  bool get isLoggedIn =>
+      _ref.read(authStateProvider).isAuthenticated;
+
+  bool get hasSession =>
+      _ref.read(posSessionProvider) != null;
+
+  bool get isShiftOpen =>
+      _ref.read(posSessionProvider)?.isShiftOpen ?? false;
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  // RouterNotifier — authState o'zgarganda GoRouter ni xabardor qiladi
   final notifier = _RouterNotifier(ref);
 
   return GoRouter(
@@ -25,13 +49,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isLoginPage = path == '/login';
       final isSetupPage = path == '/setup';
 
-      // Login qilmagan — login sahifasiga
+      // Login qilinmagan
       if (!isLoggedIn) {
         if (!isLoginPage && !isSetupPage) return '/login';
         return null;
       }
 
-      // Login qilingan — login sahifasida tursa yo'naltir
+      // Login qilingan va login sahifasida
       if (isLoggedIn && isLoginPage) {
         if (!hasSession) return '/setup';
         if (!isShiftOpen) return '/shift/open';
@@ -76,20 +100,3 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-// GoRouter ni Riverpod state o'zgarganda yangilash uchun
-class _RouterNotifier extends RouterNotifier {
-  final Ref _ref;
-
-  _RouterNotifier(this._ref) {
-    // authState o'zgarganda GoRouter redirect ni qayta ishga tushiradi
-    _ref.listen(authStateProvider, (_, __) => notifyListeners());
-    _ref.listen(posSessionProvider, (_, __) => notifyListeners());
-  }
-
-  bool get isLoggedIn => _ref.read(authStateProvider).isAuthenticated;
-
-  bool get hasSession => _ref.read(posSessionProvider) != null;
-
-  bool get isShiftOpen => _ref.read(posSessionProvider)?.isShiftOpen ?? false;
-}
