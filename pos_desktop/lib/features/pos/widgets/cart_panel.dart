@@ -155,53 +155,30 @@ class CartPanel extends ConsumerWidget {
           // Row 1: Click, Payme, Uzcard
           Row(
             children: [
-              _PayBtn(label: 'CLICK', color: const Color(0xFF6366F1), logo: 'C', onTap: onPayClick),
+              Expanded(child: _PayBtn(label: 'CLICK', color: const Color(0xFF6366F1), logo: 'C', onTap: onPayClick)),
               const SizedBox(width: 6),
-              _PayBtn(label: 'PayMe', color: const Color(0xFF00AEEF), logo: 'P', onTap: onPayPayme),
+              Expanded(child: _PayBtn(label: 'PayMe', color: const Color(0xFF00AEEF), logo: 'P', onTap: onPayPayme)),
               const SizedBox(width: 6),
-              _PayBtn(label: 'Uzcard', color: const Color(0xFF7C3AED), logo: 'U', onTap: onPayUzcard),
+              Expanded(child: _PayBtn(label: 'Uzcard', color: const Color(0xFF7C3AED), logo: 'U', onTap: onPayUzcard)),
             ],
           ),
           const SizedBox(height: 6),
           // Row 2: Naqd, Plastik, Humo
           Row(
             children: [
-              _PayBtn(
-                label: 'Naqd (F6)',
-                color: AppTheme.cashColor,
-                logo: '₾',
-                onTap: onPayCash,
-                isBig: false,
-              ),
+              Expanded(child: _PayBtn(label: 'Naqd (F6)', color: AppTheme.cashColor, logo: '₩', onTap: onPayCash)),
               const SizedBox(width: 6),
-              _PayBtn(
-                label: 'Plastik (F7)',
-                color: AppTheme.cardColor,
-                logo: '💳',
-                onTap: onPayCard,
-                isBig: false,
-              ),
+              Expanded(child: _PayBtn(label: 'Plastik (F7)', color: AppTheme.cardColor, logo: '💳', onTap: onPayCard)),
               const SizedBox(width: 6),
-              _PayBtn(
-                label: 'Humo (F9)',
-                color: AppTheme.humoColor,
-                logo: 'H',
-                onTap: onPayHumo,
-                isBig: false,
-              ),
+              Expanded(child: _PayBtn(label: 'Humo (F9)', color: AppTheme.humoColor, logo: 'H', onTap: onPayHumo)),
             ],
           ),
           const SizedBox(height: 6),
-          // Row 3: Qarz
-          SizedBox(
-            width: double.infinity,
-            child: _PayBtn(
-              label: 'Qarz',
-              color: AppTheme.debtColor,
-              logo: '🤝',
-              onTap: onPayDebt,
-              isBig: false,
-            ),
+          // Row 3: Qarz — to'liq kenglik
+          Row(
+            children: [
+              Expanded(child: _PayBtn(label: 'Qarz', color: AppTheme.debtColor, logo: '🤝', onTap: onPayDebt)),
+            ],
           ),
         ],
       ),
@@ -330,31 +307,40 @@ class _PayBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.25)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(logo, style: TextStyle(fontSize: isBig ? 16 : 13, color: color, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              logo,
+              style: TextStyle(
+                fontSize: isBig ? 16 : 13,
+                color: color,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
