@@ -4,26 +4,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static const String defaultBaseUrl = 'http://127.0.0.1:8000/api';
 
-  late final Dio _dio;
+  late Dio _dio;
   final SharedPreferences _prefs;
 
   ApiService({required SharedPreferences prefs}) : _prefs = prefs {
-    // SharedPreferences dan URL olish, yo'q bo'lsa default
-    final savedUrl = prefs.getString('api_url');
-    final baseUrl = (savedUrl != null && savedUrl.isNotEmpty)
-        ? savedUrl
-        : defaultBaseUrl;
+    _initDio();
+  }
+
+  // SharedPreferences dagi URL ni o'qib Dio ni qayta yaratish
+  void _initDio() {
+    final savedUrl = _prefs.getString('api_url') ?? '';
+    final baseUrl = savedUrl.isNotEmpty ? savedUrl : defaultBaseUrl;
+
+    print('[API] Base URL: $baseUrl');
 
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 20),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     ));
 
+    _dio.interceptors.clear();
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -31,67 +36,92 @@ class ApiService {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          print('[API] ${options.method} ${options.uri}');
+          print('[API →] ${options.method} ${options.uri}');
           handler.next(options);
         },
         onResponse: (response, handler) {
-          print('[API] ${response.statusCode} ${response.requestOptions.path}');
+          print('[API ←] ${response.statusCode} ${response.requestOptions.path}');
           handler.next(response);
         },
         onError: (error, handler) {
-          print('[API ERROR] ${error.response?.statusCode} '
+          print('[API ✗] ${error.response?.statusCode} '
               '${error.requestOptions.path}: ${error.message}');
+          if (error.response?.data != null) {
+            print('[API ✗] Body: ${error.response?.data}');
+          }
           handler.next(error);
         },
       ),
     );
   }
 
-  // Auth endpoints
+  // URL o'zgarganda Dio ni yangilash
+  void updateBaseUrl(String url) {
+    _prefs.setString('api_url', url);
+    _initDio();
+    print('[API] URL updated to: $url');
+  }
+
+  // ─── Auth ──────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>?> pinLogin({
     required int terminalId,
     required String pin,
   }) async {
+    // Har safar login qilishdan avval URL ni yangilash
+    _initDio();
+
     try {
       final response = await _dio.post('/auth/pin-login', data: {
         'terminal_id': terminalId,
         'pin': pin,
       });
 
-      // Debug: javobni ko'rish
-      print('=== PIN LOGIN RESPONSE ===');
-      print('Status: ${response.statusCode}');
-      print('Data: ${response.data}');
-      print('=========================');
+      print('[PIN LOGIN] Status: ${response.statusCode}');
+      print('[PIN LOGIN] Data keys: ${(response.data as Map?)?.keys.toList()}');
 
       if (response.statusCode == 200 && response.data != null) {
-        // Token ni darhol saqlash
         final token = response.data['token'] as String?;
         if (token != null) {
           await _prefs.setString('auth_token', token);
-          print('Token saved: $token');
         }
-        return response.data as Map<String, dynamic>;
+        return Map<String, dynamic>.from(response.data as Map);
       }
       return null;
     } on DioException catch (e) {
-      print('=== PIN LOGIN ERROR ===');
-      print('Status: ${e.response?.statusCode}');
-      print('Data: ${e.response?.data}');
-      print('Message: ${e.message}');
-      print('======================');
+      print('[PIN LOGIN ERROR] ${e.type}: ${e.message}');
+      print('[PIN LOGIN ERROR] Status: ${e.response?.statusCode}');
+      print('[PIN LOGIN ERROR] Data: ${e.response?.data}');
 
-      if (e.response?.statusCode == 401) {
-        throw Exception('PIN kod noto\'g\'ri');
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.receiveTimeout:
+        case DioExceptionType.sendTimeout:
+          throw Exception(
+              'Server javob bermayapti. Laravel ishga tushirilganmi?\n'
+              'php artisan serve');
+
+        case DioExceptionType.connectionError:
+          final url = _prefs.getString('api_url') ?? defaultBaseUrl;
+          throw Exception(
+              'Serverga ulanib bo\'lmadi.\n'
+              'URL: $url\n'
+              'Laravel ishga tushirilganmi?');
+
+        default:
+          final status = e.response?.statusCode;
+          if (status == 401) throw Exception('PIN kod noto\'g\'ri');
+          if (status == 404) throw Exception('Terminal topilmadi (ID: $terminalId)');
+          if (status == 422) {
+            final errors = e.response?.data?['errors'];
+            throw Exception('Ma\'lumot xato: $errors');
+          }
+          throw Exception(
+              'Xatolik: ${e.response?.data?['message'] ?? e.message}');
       }
-      if (e.response?.statusCode == 404) {
-        throw Exception('Terminal topilmadi. Terminal ID ni tekshiring.');
-      }
-      throw Exception('Server bilan ulanishda xatolik: ${e.message}');
     }
   }
 
-  // Products
+  // ─── Products ──────────────────────────────────────────────────────────────
   Future<List<dynamic>> getProducts({
     String? search,
     int? categoryId,
@@ -112,7 +142,8 @@ class ApiService {
 
   Future<Map<String, dynamic>?> getProductByBarcode(String barcode) async {
     try {
-      final response = await _dio.get('/products/barcode', queryParameters: {'barcode': barcode});
+      final response = await _dio.get('/products/barcode',
+          queryParameters: {'barcode': barcode});
       return response.data;
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
@@ -120,7 +151,7 @@ class ApiService {
     }
   }
 
-  // Categories
+  // ─── Categories ────────────────────────────────────────────────────────────
   Future<List<dynamic>> getCategories() async {
     try {
       final response = await _dio.get('/categories');
@@ -130,7 +161,7 @@ class ApiService {
     }
   }
 
-  // Shifts
+  // ─── Shifts ────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> openShift({
     required int terminalId,
     required int branchId,
@@ -141,7 +172,7 @@ class ApiService {
       'branch_id': branchId,
       'opening_cash': openingCash,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> closeShift({
@@ -153,19 +184,18 @@ class ApiService {
       'closing_cash': closingCash,
       'closing_note': closingNote,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> getCurrentShift(int terminalId) async {
-    final response = await _dio.get('/shifts/current', queryParameters: {
-      'terminal_id': terminalId,
-    });
-    return response.data;
+    final response = await _dio.get('/shifts/current',
+        queryParameters: {'terminal_id': terminalId});
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> getShiftReport(int shiftId) async {
     final response = await _dio.get('/shifts/$shiftId/report');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> cashIn({
@@ -178,7 +208,7 @@ class ApiService {
       'amount': amount,
       'reason': reason,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> cashOut({
@@ -191,10 +221,10 @@ class ApiService {
       'amount': amount,
       'reason': reason,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
-  // Orders
+  // ─── Orders ────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> createOrder({
     required int terminalId,
     required int shiftId,
@@ -215,20 +245,20 @@ class ApiService {
       'payment_details': paymentDetails,
       'note': note,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> getOrder(int orderId) async {
     final response = await _dio.get('/orders/$orderId/receipt');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> returnOrder(int orderId) async {
     final response = await _dio.post('/orders/$orderId/return');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
-  // Customers
+  // ─── Customers ─────────────────────────────────────────────────────────────
   Future<List<dynamic>> getCustomers({String? search}) async {
     try {
       final response = await _dio.get('/customers',
@@ -247,6 +277,6 @@ class ApiService {
       'name': name,
       'phone': phone,
     });
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 }
