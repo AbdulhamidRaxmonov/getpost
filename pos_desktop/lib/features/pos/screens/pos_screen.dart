@@ -13,6 +13,7 @@ import '../widgets/product_grid.dart';
 import '../widgets/category_bar.dart';
 import '../widgets/pos_title_bar.dart';
 import '../widgets/search_bar_widget.dart';
+import '../widgets/barcode_handler.dart';
 import '../../payment/screens/payment_screen.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
@@ -105,9 +106,48 @@ class _PosScreenState extends ConsumerState<PosScreen> with WindowListener {
     );
   }
 
-  void _showSnack(String msg) {
+  /// Search field orqali barcode qidirish (Enter bosilganda)
+  Future<void> _searchByBarcode(String barcode) async {
+    final trimmed = barcode.trim();
+    if (trimmed.length < 3) return;
+
+    try {
+      final api = ref.read(apiServiceProvider);
+      final product = await api.getProductByBarcode(trimmed);
+      if (!mounted) return;
+
+      if (product != null) {
+        final model = ProductModel.fromJson(product);
+        ref.read(cartProvider.notifier).addProduct(model);
+        // Search maydonini tozalash
+        _searchController.clear();
+        ref.read(searchQueryProvider.notifier).state = '';
+        _showSnack('✓ ${model.name} savatga qo\'shildi', isSuccess: true);
+      } else {
+        _showSnack('Mahsulot topilmadi: $trimmed', isWarning: true);
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Xatolik: $e');
+    }
+  }
+
+  void _showSnack(String msg,
+      {bool isSuccess = false, bool isWarning = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(msg,
+            style: const TextStyle(fontWeight: FontWeight.w500)),
+        backgroundColor: isSuccess
+            ? const Color(0xFF10B981)
+            : isWarning
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFFEF4444),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
@@ -126,72 +166,76 @@ class _PosScreenState extends ConsumerState<PosScreen> with WindowListener {
     final session = ref.watch(posSessionProvider);
     final authState = ref.watch(authStateProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // ── Title Bar ──────────────────────────────────────
-          PosTitleBar(
-            cashierName: authState.user?['name'] ?? 'Kassir',
-            branchName: session?.branchName ?? '',
-            terminalName: session?.terminalName ?? 'Kassa',
-            shiftId: session?.shiftId,
-            onLogout: () {
-              ref.read(authStateProvider.notifier).logout();
-              context.go('/login');
-            },
-            onCloseShift: () => context.push('/shift/close'),
-          ),
-
-          // ── Main Body ──────────────────────────────────────
-          Expanded(
-            child: Row(
-              children: [
-                // ── Left: Product Panel ──────────────────────
-                Expanded(
-                  flex: 7,
-                  child: Column(
-                    children: [
-                      // Check tabs bar
-                      _buildCheckTabs(),
-
-                      // Search bar
-                      SearchBarWidget(
-                        controller: _searchController,
-                        focusNode: _searchFocus,
-                        onChanged: (v) => ref.read(searchQueryProvider.notifier).state = v,
-                      ),
-
-                      // Category filter
-                      const CategoryBar(),
-
-                      // Product grid + cart table
-                      const Expanded(child: ProductGrid()),
-                    ],
-                  ),
-                ),
-
-                // ── Right: Cart Panel ────────────────────────
-                SizedBox(
-                  width: 310,
-                  child: CartPanel(
-                    onPayCash: () => _openPayment('cash'),
-                    onPayCard: () => _openPayment('card'),
-                    onPayClick: () => _openPayment('click'),
-                    onPayPayme: () => _openPayment('payme'),
-                    onPayHumo: () => _openPayment('humo'),
-                    onPayUzcard: () => _openPayment('uzcard'),
-                    onPayDebt: () => _openPayment('debt'),
-                    onPrechek: () => _openPayment('cash'),
-                  ),
-                ),
-              ],
+    return BarcodeHandler(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            // ── Title Bar ──────────────────────────────────────
+            PosTitleBar(
+              cashierName: authState.user?['name'] ?? 'Kassir',
+              branchName: session?.branchName ?? '',
+              terminalName: session?.terminalName ?? 'Kassa',
+              shiftId: session?.shiftId,
+              onLogout: () {
+                ref.read(authStateProvider.notifier).logout();
+                context.go('/login');
+              },
+              onCloseShift: () => context.push('/shift/close'),
             ),
-          ),
 
-          // ── Status Bar ──────────────────────────────────────
-          _buildStatusBar(session, authState),
-        ],
+            // ── Main Body ──────────────────────────────────────
+            Expanded(
+              child: Row(
+                children: [
+                  // ── Left: Product Panel ──────────────────────
+                  Expanded(
+                    flex: 7,
+                    child: Column(
+                      children: [
+                        // Check tabs bar
+                        _buildCheckTabs(),
+
+                        // Search bar — barcode qidirish ulanган
+                        SearchBarWidget(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          onChanged: (v) =>
+                              ref.read(searchQueryProvider.notifier).state = v,
+                          onBarcodeSearch: _searchByBarcode,
+                        ),
+
+                        // Category filter
+                        const CategoryBar(),
+
+                        // Product grid + cart table
+                        const Expanded(child: ProductGrid()),
+                      ],
+                    ),
+                  ),
+
+                  // ── Right: Cart Panel ────────────────────────
+                  SizedBox(
+                    width: 310,
+                    child: CartPanel(
+                      onPayCash: () => _openPayment('cash'),
+                      onPayCard: () => _openPayment('card'),
+                      onPayClick: () => _openPayment('click'),
+                      onPayPayme: () => _openPayment('payme'),
+                      onPayHumo: () => _openPayment('humo'),
+                      onPayUzcard: () => _openPayment('uzcard'),
+                      onPayDebt: () => _openPayment('debt'),
+                      onPrechek: () => _openPayment('cash'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Status Bar ──────────────────────────────────────
+            _buildStatusBar(session, authState),
+          ],
+        ),
       ),
     );
   }
